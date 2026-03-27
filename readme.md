@@ -3,7 +3,7 @@ Pour dessiner un carré en respectant la syntaxe logo proposée, on peut utilise
 On répète 4 fois l'instruction "avancer de 100 puis tourner à 90°" afin de former un carré : 
 
 
-repeat 4 [
+$repeat 4 [
   forward 100
   right 90
-]
+]$
