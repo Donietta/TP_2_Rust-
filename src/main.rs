@@ -19,6 +19,16 @@ pub enum Order {
     Right,
 }
 
+struct Logo {
+    position_x: f32,
+    position_y: f32,
+    orientation : f32, // en degrés
+    pen_status : bool, // on considère ici que le booléen est vrai quand le stylo est baissé
+    svg_contenu : String, // String dans laquelle on sauvegarde le contenu du fichier SVG au cours du programme Logo
+}
+
+
+
 fn grammar() -> Grammar<AST> {
     santiago::grammar!(
 
@@ -117,6 +127,59 @@ fn eval(ast : &AST){
         _ => {}
     }
 }
+impl Logo {
+
+    fn forward(&mut self, distance: f32) {
+        let rad = self.orientation.to_radians();
+
+        let new_x = self.position_x + distance * rad.cos();
+        let new_y = self.position_y + distance * rad.sin();
+
+        if self.pen_status {
+            self.svg_contenu.push_str(&format!(
+                r#"<path d="M {} {} L {} {}" stroke="black"/>"#,
+                self.position_x, self.position_y, new_x, new_y
+            ));
+        }
+
+        self.position_x = new_x;
+        self.position_y = new_y;
+    }
+
+    fn left(&mut self, orientation: f32) {
+        self.orientation -= orientation;
+    }
+
+    fn right(&mut self, orientation: f32) {
+        self.orientation += orientation;
+    }
+
+    fn backward(&mut self, distance: f32) {
+        self.forward(-distance);
+    }
+    fn compile(&mut self, ast: AST) {
+
+        match ast {
+            AST::Program(commands) => {
+                for cmd in commands {
+                    self.compile(cmd);
+                }
+            }
+
+            AST::Command(order, value) => {
+                match order {
+                    Order::Forward => self.forward(value as f32),
+                    Order::Backward => self.forward(-(value as f32)),
+                    Order::Left => self.left(value as f32),
+                    Order::Right => self.right(value as f32),
+                }
+            }
+
+            AST::Empty => {}
+            _ => {}
+        }
+    }
+}
 fn main() {
     let lexer_rules = lexer_rules();
     let grammar = grammar();
@@ -134,4 +197,28 @@ fn main() {
     println!("{:?}", ast);
 
     eval(&ast);
+
+    // création d'une instance de Logo pour tester
+    let mut logo = Logo {
+        position_x: 0.0,
+        position_y: 0.0,
+        orientation: 0.0,
+        pen_status: true,
+        svg_contenu: String::new(),
+    };
+
+    // appel de compile
+    logo.compile(ast);
+
+    // wrap svg
+    let svg = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="300" height="300">
+{}
+</svg>"#,
+        logo.svg_contenu
+    );
+
+    //sauvegarde
+    std::fs::write("output.svg", svg).expect("Unable to write SVG file");
+    println!("SVG generated: output.svg");
 }
