@@ -4,7 +4,7 @@ use santiago::grammar::Grammar;
 #[derive(Debug)]
 pub enum AST {
     Program(Vec<AST>),              // liste de commandes et fin
-    Command(Order, i32),              // wrapper 
+    Command(Order, i32),              // wrapper
     Order(Order),
     Number(i32),                    // <number>
     Empty,                          // règle ""
@@ -27,6 +27,14 @@ struct Logo {
     svg_contenu : String, // String dans laquelle on sauvegarde le contenu du fichier SVG au cours du programme Logo
 }
 
+
+// struct Turtle sur le modèle de Logo utilisée pour l'interpréteur
+struct Turtle {
+    position_x: f32,
+    position_y: f32,
+    orientation: f32,
+    pen_status : bool,
+}
 
 
 fn grammar() -> Grammar<AST> {
@@ -55,7 +63,7 @@ fn grammar() -> Grammar<AST> {
 
             if let (AST::Order(o),AST::Number(n))=(order,number){
                 AST::Command(o,n)
-            } 
+            }
             else {
                 panic!("invalid command structure");
             }
@@ -99,8 +107,8 @@ pub fn lexer_rules() -> LexerRules{
         "DEFAULT" | "INT" = pattern r"[0-9]+";
 
     )
-    
-}   
+
+}
 
 fn eval(ast : &AST){
     match ast {
@@ -157,7 +165,7 @@ impl Logo {
     fn backward(&mut self, distance: f32) {
         self.forward(-distance);
     }
-    fn compile(&mut self, ast: AST) {
+    fn compile(&mut self, ast: &AST) {
 
         match ast {
             AST::Program(commands) => {
@@ -168,10 +176,10 @@ impl Logo {
 
             AST::Command(order, value) => {
                 match order {
-                    Order::Forward => self.forward(value as f32),
-                    Order::Backward => self.forward(-(value as f32)),
-                    Order::Left => self.left(value as f32),
-                    Order::Right => self.right(value as f32),
+                    Order::Forward => self.forward(*value as f32),
+                    Order::Backward => self.forward(-(*value as f32)),
+                    Order::Left => self.left(*value as f32),
+                    Order::Right => self.right(*value as f32),
                 }
             }
 
@@ -180,6 +188,68 @@ impl Logo {
         }
     }
 }
+
+
+impl Turtle {
+    fn forward(&mut self, distance: f32) {
+        let rad = self.orientation.to_radians();
+        let new_x = self.position_x + distance * rad.cos();
+        let new_y = self.position_y + distance * rad.sin();
+
+        if self.pen_status {
+            println!("Draw line: ({}, {}) → ({}, {})", self.position_x, self.position_y, new_x, new_y);
+        } else {
+            println!("Move to ({}, {})", new_x, new_y);
+        }
+
+        self.position_x = new_x;
+        self.position_y = new_y;
+    }
+
+    fn backward(&mut self, distance: f32) {
+        self.forward(-distance);
+    }
+
+    fn left(&mut self, orientation: f32) {
+        self.orientation -= orientation;
+        println!("Turn left {}°, orientation now {}", orientation, self.orientation);
+    }
+
+    fn right(&mut self, orientation: f32) {
+        self.orientation += orientation;
+        println!("Turn right {}°, orientation now {}", orientation, self.orientation);
+    }
+
+    fn pen_up(&mut self) {
+        self.pen_status = false;
+    }
+
+    fn pen_status(&mut self) {
+        self.pen_status = true;
+    }
+    fn interpret(&mut self, ast: &AST) {
+        match ast {
+            AST::Program(commands) => {
+                for cmd in commands {
+                    self.interpret(cmd); // recursive call
+                }
+            }
+            AST::Command(order, value) => {
+                // borrow instead of moving
+                match order {
+                    Order::Forward => self.forward(*value as f32),
+                    Order::Backward => self.backward(*value as f32),
+                    Order::Left => self.left(*value as f32),
+                    Order::Right => self.right(*value as f32),
+                }
+            }
+            AST::Empty | AST::ProgramEnd => {}
+            _ => {}
+        }
+    }
+}
+
+
 fn main() {
     let lexer_rules = lexer_rules();
     let grammar = grammar();
@@ -191,7 +261,7 @@ fn main() {
     let parse_trees = santiago::parser::parse(&grammar,&lexemes)
         .expect("syntax error");
 
-    
+
     let ast = parse_trees[0].as_abstract_syntax_tree();
 
     println!("{:?}", ast);
@@ -208,7 +278,7 @@ fn main() {
     };
 
     // appel de compile
-    logo.compile(ast);
+    logo.compile(&ast);
 
     // wrap svg
     let svg = format!(
@@ -221,4 +291,15 @@ fn main() {
     //sauvegarde
     std::fs::write("output.svg", svg).expect("Unable to write SVG file");
     println!("SVG generated: output.svg");
+
+    //création d'un instance de turtle pour tester l'interpréteur
+    let mut turtle = Turtle {
+        position_x : 0.0,
+        position_y : 0.0,
+        orientation : 0.0,
+        pen_status: true,
+    };
+
+    // appel interpreter
+    turtle.interpret(&ast);
 }
