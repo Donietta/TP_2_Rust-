@@ -1,7 +1,13 @@
 [package]
-name = "tp2"
+name = "Cargo"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 santiago = "*"
+svg_fmt = "*"
+
+
+[[bin]]
+name = "generateSVG"
+path = "src/bin/generateSVG.rs"
